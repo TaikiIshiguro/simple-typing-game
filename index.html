@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>タイピングゲーム</title>
+  <style>
+    /*
+      ブラウザ動作型タイピングゲーム
+      - 外部ライブラリ不使用
+      - CSS はこの style タグ内に集約
+      - 出題データのみ words.csv から読み込み
+    */
+
+    :root {
+      --color-primary: #0017c1;
+      --color-primary-hover: #000082;
+      --color-bg: #f7f7f8;
+      --color-surface: #ffffff;
+      --color-text: #1a1a1c;
+      --color-muted: #626264;
+      --color-border: #d8d8db;
+      --color-success: #008000;
+      --color-error: #d18d00;
+      --color-danger: #c62828;
+      --color-focus: #ffdc00;
+      --radius: 14px;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: sans-serif;
+      line-height: 1.6;
+    }
+
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 4px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    .app {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .label {
+      color: var(--color-primary);
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    h1,
+    h2,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 0;
+      font-size: clamp(1.9rem, 5vw, 3.1rem);
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      line-height: 1.25;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.is-active {
+      display: block;
+    }
+
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(20px, 4vw, 36px);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .form-field label {
+      font-weight: 700;
+    }
+
+    select,
+    input[type="file"] {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: #fff;
+      padding: 12px 14px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .button {
+      appearance: none;
+      border: 2px solid var(--color-primary);
+      border-radius: 999px;
+      padding: 12px 22px;
+      background: var(--color-primary);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 120ms ease, color 120ms ease, transform 80ms ease;
+    }
+
+    .button:hover {
+      background: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .button.secondary {
+      background: #fff;
+      color: var(--color-primary);
+    }
+
+    .button.secondary:hover {
+      background: #eef0ff;
+    }
+
+    .button[disabled] {
+      border-color: #b4b4b7;
+      background: #d8d8db;
+      color: #626264;
+      cursor: not-allowed;
+    }
+
+    .notice {
+      border-left: 5px solid var(--color-primary);
+      background: #eef0ff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #17174a;
+      margin: 18px 0;
+    }
+
+    .error-box {
+      display: none;
+      border-left: 5px solid var(--color-danger);
+      background: #fff1f1;
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #600;
+      margin: 18px 0;
+    }
+
+    .error-box.is-visible {
+      display: block;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat {
+      padding: 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .stat dt {
+      margin: 0;
+      color: var(--color-muted);
+      font-size: 0.9rem;
+    }
+
+    .stat dd {
+      margin: 2px 0 0;
+      font-size: clamp(1.3rem, 2.8vw, 2rem);
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .question-area {
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: clamp(18px, 4vw, 30px);
+      background: #fff;
+      transition: border-color 120ms ease, background-color 120ms ease;
+    }
+
+    .question-area.miss {
+      border-color: var(--color-error);
+      background: #fff9e8;
+      animation: shake 180ms ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    .kanji-text {
+      margin-bottom: 8px;
+      font-size: clamp(2rem, 7vw, 4.8rem);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+
+    .kana-text {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px;
+      min-height: 56px;
+      margin-bottom: 20px;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+    }
+
+    .kana-unit {
+      display: inline-block;
+      padding: 2px 4px;
+      border-radius: 8px;
+      color: var(--color-muted);
+    }
+
+    .kana-unit.done {
+      color: var(--color-success);
+      background: #e7f6e7;
+    }
+
+    .kana-unit.current {
+      color: var(--color-text);
+      background: var(--color-focus);
+      font-weight: 800;
+    }
+
+    .romaji-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .romaji-box {
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 88px;
+      background: #fafafa;
+    }
+
+    .romaji-box .caption {
+      color: var(--color-muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .romaji {
+      margin-top: 4px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: clamp(1.35rem, 4vw, 2rem);
+      word-break: break-all;
+    }
+
+    .guide-char {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5em;
+      min-height: 2.5em;
+      margin-top: 6px;
+      border-radius: 12px;
+      background: var(--color-primary);
+      color: #fff;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: clamp(1.5rem, 4vw, 2.4rem);
+      font-weight: 800;
+    }
+
+    .progress-bar {
+      overflow: hidden;
+      height: 12px;
+      margin: 18px 0 0;
+      border-radius: 999px;
+      background: #e8e8eb;
+    }
+
+    .progress-bar > span {
+      display: block;
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-primary), #00a3ff);
+      transition: width 100ms linear;
+    }
+
+    .result-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 24px 0;
+    }
+
+    .category-counts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .category-pill {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff;
+      font-size: 0.95rem;
+    }
+
+    .small {
+      color: var(--color-muted);
+      font-size: 0.95rem;
+    }
+
+    .loading {
+      color: var(--color-muted);
+    }
+
+    @media (max-width: 820px) {
+      .grid,
+      .romaji-panel,
+      .result-list {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 520px) {
+      .app {
+        width: min(100% - 20px, 1120px);
+        padding-top: 18px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <h1>タイピングゲーム</h1>
+      </div>
+    </header>
+
+    <!-- タイトル画面 -->
+    <section id="titleScreen" class="screen is-active" aria-labelledby="titleHeading">
+      <div class="card">
+        <!--
+        <h2 id="titleHeading">タイピングゲーム</h2>
+        -->
+        <p>
+          表示された用語の読みをローマ字で入力してください。Backspace による修正はできません。
+          入力方式は <strong>shi / si</strong> のような複数候補に対応しています。
+        </p>
+
+        <div id="loadNotice" class="notice loading">words.csv を読み込んでいます。</div>
+        <div id="errorBox" class="error-box" role="alert"></div>
+
+        <div class="grid">
+          <div>
+            <div class="form-field">
+              <label for="categorySelect">カテゴリー</label>
+              <select id="categorySelect" disabled>
+                <option value="すべて">すべて</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="timeSelect">制限時間</label>
+              <select id="timeSelect">
+                <option value="30">30秒</option>
+                <option value="60" selected>60秒</option>
+                <option value="120">120秒</option>
+              </select>
+            </div>
+
+            <div class="button-row">
+              <button id="startButton" class="button" type="button" disabled>スタート</button>
+            </div>
+          </div>
+
+          <div>
+            <h3>カテゴリー別出題数</h3>
+            <div id="categoryCounts" class="category-counts"></div>
+            <p class="small">
+              HTML を直接ファイルとして開いた場合、ブラウザの制限により CSV を自動読み込みできないことがあります。
+              その場合は下のボタンから words.csv を選択してください。
+            </p>
+            <div class="form-field">
+              <label for="csvFileInput">CSV 手動読み込み</label>
+              <input id="csvFileInput" type="file" accept=".csv,text/csv">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- プレイ画面 -->
+    <section id="playScreen" class="screen" aria-labelledby="playHeading">
+      <h2 id="playHeading" class="visually-hidden">プレイ画面</h2>
+
+      <dl class="stats" aria-label="ゲーム情報">
+        <div class="stat">
+          <dt>カテゴリー</dt>
+          <dd id="statCategory">-</dd>
+        </div>
+        <div class="stat">
+          <dt>スコア</dt>
+          <dd id="statScore">0</dd>
+        </div>
+        <div class="stat">
+          <dt>正解数</dt>
+          <dd id="statCorrect">0</dd>
+        </div>
+        <div class="stat">
+          <dt>ミス数</dt>
+          <dd id="statMiss">0</dd>
+        </div>
+        <div class="stat">
+          <dt>残り時間</dt>
+          <dd id="statTime">0</dd>
+        </div>
+      </dl>
+
+      <div id="questionArea" class="question-area">
+        <div id="kanjiText" class="kanji-text">-</div>
+        <div id="kanaText" class="kana-text" aria-label="出題文字列 ひらがな"></div>
+
+        <div class="romaji-panel">
+          <div class="romaji-box">
+            <div class="caption">入力中ローマ字</div>
+            <div id="typedRomaji" class="romaji"></div>
+          </div>
+          <div class="romaji-box">
+            <div class="caption">次に入力すべき文字</div>
+            <div id="nextGuide" class="guide-char">-</div>
+          </div>
+        </div>
+
+        <div class="progress-bar" aria-hidden="true">
+          <span id="questionProgress"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 結果画面 -->
+    <section id="resultScreen" class="screen" aria-labelledby="resultHeading">
+      <div class="card">
+        <h2 id="resultHeading">結果</h2>
+        <div id="resultList" class="result-list"></div>
+        <div class="button-row">
+          <button id="retryButton" class="button" type="button">もう一度遊ぶ</button>
+          <button id="backTitleButton" class="button secondary" type="button">タイトルへ戻る</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    /**********************************************************************
+     * 設定値
+     **********************************************************************/
+
+    // スコア計算は定数として管理し、後から変更しやすくする。
+    const SCORE_RULES = {
+      correctKey: 10,
+      missKey: -5,
+      completeWord: 10,
+    };
+
+    const CSV_FILE_NAME = "words.csv";
+    const GAME_STATES = {
+      title: "title",
+      playing: "playing",
+      result: "result",
+    };
+
+    // ローマ字変換テーブル。
+    // 問題データ側にはローマ字を持たせず、HTML 内の定義だけで変換する。
+    const ROMAJI_TABLE = {
+      "あ": ["a"], "い": ["i", "yi"], "う": ["u", "wu"], "え": ["e"], "お": ["o"],
+      "か": ["ka", "ca"], "き": ["ki"], "く": ["ku", "cu", "qu"], "け": ["ke"], "こ": ["ko", "co"],
+      "さ": ["sa"], "し": ["shi", "si"], "す": ["su"], "せ": ["se"], "そ": ["so"],
+      "た": ["ta"], "ち": ["chi", "ti"], "つ": ["tsu", "tu"], "て": ["te"], "と": ["to"],
+      "な": ["na"], "に": ["ni"], "ぬ": ["nu"], "ね": ["ne"], "の": ["no"],
+      "は": ["ha"], "ひ": ["hi"], "ふ": ["fu", "hu"], "へ": ["he"], "ほ": ["ho"],
+      "ま": ["ma"], "み": ["mi"], "む": ["mu"], "め": ["me"], "も": ["mo"],
+      "や": ["ya"], "ゆ": ["yu"], "よ": ["yo"],
+      "ら": ["ra"], "り": ["ri"], "る": ["ru"], "れ": ["re"], "ろ": ["ro"],
+      "わ": ["wa"], "を": ["wo", "o"],
+      "が": ["ga"], "ぎ": ["gi"], "ぐ": ["gu"], "げ": ["ge"], "ご": ["go"],
+      "ざ": ["za"], "じ": ["ji", "zi"], "ず": ["zu"], "ぜ": ["ze"], "ぞ": ["zo"],
+      "だ": ["da"], "ぢ": ["di"], "づ": ["du"], "で": ["de"], "ど": ["do"],
+      "ば": ["ba"], "び": ["bi"], "ぶ": ["bu"], "べ": ["be"], "ぼ": ["bo"],
+      "ぱ": ["pa"], "ぴ": ["pi"], "ぷ": ["pu"], "ぺ": ["pe"], "ぽ": ["po"],
+
+      // 拗音。トークン化時に 2 文字を 1 単位として扱う。
+      "きゃ": ["kya"], "きゅ": ["kyu"], "きょ": ["kyo"],
+      "しゃ": ["sha", "sya"], "しゅ": ["shu", "syu"], "しょ": ["sho", "syo"],
+      "ちゃ": ["cha", "tya", "cya"], "ちゅ": ["chu", "tyu", "cyu"], "ちょ": ["cho", "tyo", "cyo"],
+      "にゃ": ["nya"], "にゅ": ["nyu"], "にょ": ["nyo"],
+      "ひゃ": ["hya"], "ひゅ": ["hyu"], "ひょ": ["hyo"],
+      "みゃ": ["mya"], "みゅ": ["myu"], "みょ": ["myo"],
+      "りゃ": ["rya"], "りゅ": ["ryu"], "りょ": ["ryo"],
+      "ぎゃ": ["gya"], "ぎゅ": ["gyu"], "ぎょ": ["gyo"],
+      "じゃ": ["ja", "jya", "zya"], "じゅ": ["ju", "jyu", "zyu"], "じょ": ["jo", "jyo", "zyo"],
+      "びゃ": ["bya"], "びゅ": ["byu"], "びょ": ["byo"],
+      "ぴゃ": ["pya"], "ぴゅ": ["pyu"], "ぴょ": ["pyo"],
+
+      // 外来語など。
+      "うぁ": ["wha"], "うぃ": ["wi", "whi"], "うぇ": ["we", "whe"], "うぉ": ["who"],
+      "ふぁ": ["fa"], "ふぃ": ["fi"], "ふぇ": ["fe"], "ふぉ": ["fo"],
+      "てぃ": ["thi", "ti"], "でぃ": ["dhi", "di"],
+      "とぅ": ["twu", "tu"], "どぅ": ["dwu", "du"],
+      "ぁ": ["xa", "la"], "ぃ": ["xi", "li"], "ぅ": ["xu", "lu"], "ぇ": ["xe", "le"], "ぉ": ["xo", "lo"],
+      "ゃ": ["xya", "lya"], "ゅ": ["xyu", "lyu"], "ょ": ["xyo", "lyo"],
+      "ー": ["-"],
+      "・": ["/"],
+      "、": [","],
+      "。": ["."],
+      " ": [" "],
+    };
+
+    /**********************************************************************
+     * DOM 参照
+     **********************************************************************/
+
+    const elements = {
+      titleScreen: document.getElementById("titleScreen"),
+      playScreen: document.getElementById("playScreen"),
+      resultScreen: document.getElementById("resultScreen"),
+      loadNotice: document.getElementById("loadNotice"),
+      errorBox: document.getElementById("errorBox"),
+      categorySelect: document.getElementById("categorySelect"),
+      timeSelect: document.getElementById("timeSelect"),
+      startButton: document.getElementById("startButton"),
+      csvFileInput: document.getElementById("csvFileInput"),
+      categoryCounts: document.getElementById("categoryCounts"),
+      statCategory: document.getElementById("statCategory"),
+      statScore: document.getElementById("statScore"),
+      statCorrect: document.getElementById("statCorrect"),
+      statMiss: document.getElementById("statMiss"),
+      statTime: document.getElementById("statTime"),
+      questionArea: document.getElementById("questionArea"),
+      kanjiText: document.getElementById("kanjiText"),
+      kanaText: document.getElementById("kanaText"),
+      typedRomaji: document.getElementById("typedRomaji"),
+      nextGuide: document.getElementById("nextGuide"),
+      questionProgress: document.getElementById("questionProgress"),
+      resultList: document.getElementById("resultList"),
+      retryButton: document.getElementById("retryButton"),
+      backTitleButton: document.getElementById("backTitleButton"),
+    };
+
+    /**********************************************************************
+     * ゲーム状態
+     **********************************************************************/
+
+    const game = {
+      state: GAME_STATES.title,
+      words: [],
+      selectedCategory: "すべて",
+      timeLimitSec: 60,
+      remainingSec: 60,
+      startTimeMs: 0,
+      timerId: null,
+      score: 0,
+      correctWords: 0,
+      missKeys: 0,
+      typedKeys: 0,
+      currentWord: null,
+      currentUnits: [],
+      currentSequences: [],
+      typedPrefix: "",
+      usedIndexes: new Set(),
+      lastSelection: { category: "すべて", timeLimitSec: 60 },
+    };
+
+    /**********************************************************************
+     * 初期化
+     **********************************************************************/
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    function init() {
+      bindEvents();
+      loadWordsFromCsvFile();
+    }
+
+    function bindEvents() {
+      elements.startButton.addEventListener("click", startGame);
+      elements.retryButton.addEventListener("click", retryGame);
+      elements.backTitleButton.addEventListener("click", backToTitle);
+      elements.csvFileInput.addEventListener("change", handleCsvFileSelected);
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    /**********************************************************************
+     * CSV 読み込み・解析
+     **********************************************************************/
+
+    async function loadWordsFromCsvFile() {
+      try {
+        // HTML と同じフォルダにある words.csv を読み込む。
+        const response = await fetch(CSV_FILE_NAME, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`${CSV_FILE_NAME} の取得に失敗しました。HTTP status: ${response.status}`);
+        }
+        const csvText = await response.text();
+        setWords(parseWordsCsv(csvText));
+        showLoadNotice(`${CSV_FILE_NAME} を読み込みました。`, false);
+      } catch (error) {
+        showLoadNotice("CSV の自動読み込みに失敗しました。必要に応じて words.csv を手動で選択してください。", true);
+        showError(String(error.message || error));
+      }
+    }
+
+    function handleCsvFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          setWords(parseWordsCsv(String(reader.result || "")));
+          hideError();
+          showLoadNotice(`${file.name} を読み込みました。`, false);
+        } catch (error) {
+          showError(String(error.message || error));
+        }
+      };
+      reader.onerror = () => showError("CSV ファイルの読み込みに失敗しました。");
+      reader.readAsText(file, "utf-8");
+    }
+
+    function parseWordsCsv(csvText) {
+      const rows = parseCsv(csvText.trim());
+      if (rows.length < 2) {
+        throw new Error("CSV にデータ行がありません。");
+      }
+
+      // 1 行目はヘッダーとして扱う。
+      const dataRows = rows.slice(1);
+      const words = dataRows
+        .filter(row => row.some(cell => cell.trim() !== ""))
+        .map((row, index) => {
+          const category = (row[0] || "").trim();
+          const kanji = (row[1] || "").trim();
+          const kana = normalizeKana((row[2] || "").trim());
+
+          if (!category || !kanji || !kana) {
+            throw new Error(`CSV ${index + 2} 行目に空欄があります。`);
+          }
+
+          // 変換できない文字が含まれていれば、この時点で検出する。
+          validateKana(kana, index + 2);
+
+          return { category, kanji, kana, index };
+        });
+
+      if (words.length === 0) {
+        throw new Error("有効な出題データがありません。");
+      }
+      return words;
+    }
+
+    function parseCsv(text) {
+      // ダブルクォート、カンマ、改行を最低限正しく扱う簡易 CSV パーサー。
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === "," && !inQuotes) {
+          row.push(cell);
+          cell = "";
+        } else if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") i++;
+          row.push(cell);
+          rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += char;
+        }
+      }
+
+      row.push(cell);
+      rows.push(row);
+      return rows;
+    }
+
+    function normalizeKana(text) {
+      // カタカナが混じった場合はひらがなに寄せる。
+      return text.replace(/[ァ-ン]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).toLowerCase();
+    }
+
+    function validateKana(kana, lineNumber) {
+      const units = tokenizeKana(kana);
+      for (const unit of units) {
+        if (unit === "っ" || unit === "ん") continue;
+        if (!ROMAJI_TABLE[unit]) {
+          throw new Error(`CSV ${lineNumber} 行目の「${unit}」に対応するローマ字定義がありません。`);
+        }
+      }
+    }
+
+    function setWords(words) {
+      game.words = words;
+      renderCategoryOptions();
+      renderCategoryCounts();
+      elements.startButton.disabled = false;
+      elements.categorySelect.disabled = false;
+    }
+
+    function renderCategoryOptions() {
+      const categories = getCategories();
+      elements.categorySelect.innerHTML = "";
+      elements.categorySelect.appendChild(new Option("すべて", "すべて"));
+      for (const category of categories) {
+        elements.categorySelect.appendChild(new Option(category, category));
+      }
+    }
+
+    function renderCategoryCounts() {
+      const counts = new Map();
+      for (const word of game.words) {
+        counts.set(word.category, (counts.get(word.category) || 0) + 1);
+      }
+
+      const total = game.words.length;
+      const html = [categoryCountHtml("すべて", total)];
+      for (const [category, count] of counts.entries()) {
+        html.push(categoryCountHtml(category, count));
+      }
+      elements.categoryCounts.innerHTML = html.join("");
+    }
+
+    function categoryCountHtml(category, count) {
+      return `<div class="category-pill"><span>${escapeHtml(category)}</span><strong>${count} 問</strong></div>`;
+    }
+
+    function getCategories() {
+      return [...new Set(game.words.map(word => word.category))].sort((a, b) => a.localeCompare(b, "ja"));
+    }
+
+    /**********************************************************************
+     * 状態遷移
+     **********************************************************************/
+
+    function setScreen(state) {
+      game.state = state;
+      elements.titleScreen.classList.toggle("is-active", state === GAME_STATES.title);
+      elements.playScreen.classList.toggle("is-active", state === GAME_STATES.playing);
+      elements.resultScreen.classList.toggle("is-active", state === GAME_STATES.result);
+    }
+
+    function startGame() {
+      const category = elements.categorySelect.value;
+      const timeLimitSec = Number(elements.timeSelect.value);
+      game.lastSelection = { category, timeLimitSec };
+      resetGame(category, timeLimitSec);
+      setScreen(GAME_STATES.playing);
+      pickNextWord();
+      startTimer();
+      renderPlay();
+    }
+
+    function retryGame() {
+      resetGame(game.lastSelection.category, game.lastSelection.timeLimitSec);
+      setScreen(GAME_STATES.playing);
+      pickNextWord();
+      startTimer();
+      renderPlay();
+    }
+
+    function backToTitle() {
+      stopTimer();
+      setScreen(GAME_STATES.title);
+    }
+
+    function finishGame() {
+      stopTimer();
+      renderResult();
+      setScreen(GAME_STATES.result);
+    }
+
+    function resetGame(category, timeLimitSec) {
+      game.selectedCategory = category;
+      game.timeLimitSec = timeLimitSec;
+      game.remainingSec = timeLimitSec;
+      game.startTimeMs = Date.now();
+      game.score = 0;
+      game.correctWords = 0;
+      game.missKeys = 0;
+      game.typedKeys = 0;
+      game.currentWord = null;
+      game.currentUnits = [];
+      game.currentSequences = [];
+      game.typedPrefix = "";
+      game.usedIndexes = new Set();
+      stopTimer();
+    }
+
+    /**********************************************************************
+     * タイマー
+     **********************************************************************/
+
+    function startTimer() {
+      game.startTimeMs = Date.now();
+      game.remainingSec = game.timeLimitSec;
+      renderStats();
+
+      game.timerId = window.setInterval(() => {
+        const elapsedSec = Math.floor((Date.now() - game.startTimeMs) / 1000);
+        game.remainingSec = Math.max(0, game.timeLimitSec - elapsedSec);
+        renderStats();
+
+        if (game.remainingSec <= 0) {
+          finishGame();
+        }
+      }, 200);
+    }
+
+    function stopTimer() {
+      if (game.timerId !== null) {
+        window.clearInterval(game.timerId);
+        game.timerId = null;
+      }
+    }
+
+    /**********************************************************************
+     * 出題
+     **********************************************************************/
+
+    function getTargetWords() {
+      if (game.selectedCategory === "すべて") return game.words;
+      return game.words.filter(word => word.category === game.selectedCategory);
+    }
+
+    function pickNextWord() {
+      const targets = getTargetWords();
+      if (targets.length === 0) {
+        finishGame();
+        return;
+      }
+
+      // 可能な限り重複を避ける。
+      const unused = targets.filter(word => !game.usedIndexes.has(word.index));
+      const pool = unused.length > 0 ? unused : targets;
+      if (unused.length === 0) game.usedIndexes.clear();
+
+      const word = pool[Math.floor(Math.random() * pool.length)];
+      game.usedIndexes.add(word.index);
+      game.currentWord = word;
+      game.currentUnits = tokenizeKana(word.kana);
+      game.currentSequences = generateRomajiSequences(game.currentUnits);
+      game.typedPrefix = "";
+      renderQuestion();
+    }
+
+    /**********************************************************************
+     * かな列保持方式・ローマ字候補生成
+     **********************************************************************/
+
+    function tokenizeKana(kana) {
+      // 小さい「ゃゅょぁぃぅぇぉ」は直前の文字と結合できる場合、1 単位として扱う。
+      const smallChars = new Set(["ゃ", "ゅ", "ょ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]);
+      const units = [];
+
+      for (const char of [...kana]) {
+        if (smallChars.has(char) && units.length > 0) {
+          const combined = units[units.length - 1] + char;
+          if (ROMAJI_TABLE[combined]) {
+            units[units.length - 1] = combined;
+            continue;
+          }
+        }
+        units.push(char);
+      }
+      return units;
+    }
+
+    function generateRomajiSequences(units) {
+      // 各候補は { full: "romaji", segments: ["jo", "u", ...] } の形で保持する。
+      // typedPrefix との前方一致により、入力が進むたびに候補を絞り込む。
+      return buildSequences(units, 0).filter(seq => seq.full.length > 0);
+    }
+
+    function buildSequences(units, index) {
+      if (index >= units.length) {
+        return [{ full: "", segments: [] }];
+      }
+
+      const unit = units[index];
+      const tails = buildSequences(units, index + 1);
+      const sequences = [];
+
+      if (unit === "っ") {
+        // 「っ」は次のローマ字候補の先頭子音を重ねる。
+        for (const tail of tails) {
+          const consonant = getLeadingConsonant(tail.full);
+          if (!consonant) continue;
+          sequences.push({
+            full: consonant + tail.full,
+            segments: [consonant, ...tail.segments],
+          });
+        }
+        return uniqueSequences(sequences);
+      }
+
+      const candidates = getRomajiCandidatesForUnit(units, index, tails);
+      for (const candidate of candidates) {
+        for (const tail of tails) {
+          sequences.push({
+            full: candidate + tail.full,
+            segments: [candidate, ...tail.segments],
+          });
+        }
+      }
+      return uniqueSequences(sequences);
+    }
+
+    function getRomajiCandidatesForUnit(units, index, tails) {
+      const unit = units[index];
+
+      if (unit === "ん") {
+        const nextFulls = tails.map(tail => tail.full).filter(Boolean);
+        const atEnd = nextFulls.length === 0;
+        const nextNeedsDoubleN = nextFulls.some(full => /^[aiueoyn]/.test(full));
+
+        // 末尾は  nn のみ許容。
+        if (atEnd) return ["nn"];
+
+        // 次が母音・y・n の場合、n だけだと次音と曖昧になるため nn のみ許容。
+        if (nextNeedsDoubleN) return ["nn"];
+
+        // 次が子音の場合は n / nn を許容。
+        return ["n", "nn"];
+      }
+
+      return ROMAJI_TABLE[unit] || [];
+    }
+
+    function getLeadingConsonant(text) {
+      if (!text) return "";
+      const first = text[0];
+      return /^[bcdfghjklmpqrstvwxyz]$/.test(first) && first !== "n" ? first : "";
+    }
+
+    function uniqueSequences(sequences) {
+      const map = new Map();
+      for (const seq of sequences) {
+        if (!map.has(seq.full)) map.set(seq.full, seq);
+      }
+      return [...map.values()];
+    }
+
+    /**********************************************************************
+     * キー入力判定
+     **********************************************************************/
+
+    function handleKeyDown(event) {
+      if (game.state !== GAME_STATES.playing) return;
+
+      // Backspace による修正は不可。ブラウザバック等の副作用を防ぐ。
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        registerMiss();
+        return;
+      }
+
+      // 1 文字の通常キーのみ対象とする。Shift や Ctrl などは無視。
+      if (event.key.length !== 1) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      event.preventDefault();
+      const key = event.key.toLowerCase();
+      const nextPrefix = game.typedPrefix + key;
+      const candidates = getActiveSequences(nextPrefix);
+
+      if (candidates.length > 0) {
+        game.typedPrefix = nextPrefix;
+        game.typedKeys += 1;
+        game.score += SCORE_RULES.correctKey;
+
+        if (isWordComplete()) {
+          game.correctWords += 1;
+          game.score += SCORE_RULES.completeWord;
+          pickNextWord();
+        } else {
+          renderQuestion();
+        }
+        renderStats();
+      } else {
+        registerMiss();
+      }
+    }
+
+    function getActiveSequences(prefix = game.typedPrefix) {
+      return game.currentSequences.filter(seq => seq.full.startsWith(prefix));
+    }
+
+    function isWordComplete() {
+      return game.currentSequences.some(seq => seq.full === game.typedPrefix);
+    }
+
+    function registerMiss() {
+      game.missKeys += 1;
+      game.score += SCORE_RULES.missKey;
+      renderStats();
+      showMissFeedback();
+    }
+
+    function showMissFeedback() {
+      elements.questionArea.classList.remove("miss");
+      // クラス再付与でアニメーションを毎回発火させる。
+      void elements.questionArea.offsetWidth;
+      elements.questionArea.classList.add("miss");
+      window.setTimeout(() => elements.questionArea.classList.remove("miss"), 220);
+    }
+
+    /**********************************************************************
+     * 描画
+     **********************************************************************/
+
+    function renderPlay() {
+      renderStats();
+      renderQuestion();
+    }
+
+    function renderStats() {
+      elements.statCategory.textContent = game.selectedCategory;
+      elements.statScore.textContent = String(game.score);
+      elements.statCorrect.textContent = String(game.correctWords);
+      elements.statMiss.textContent = String(game.missKeys);
+      elements.statTime.textContent = String(game.remainingSec);
+    }
+
+    function renderQuestion() {
+      if (!game.currentWord) return;
+
+      elements.kanjiText.textContent = game.currentWord.kanji;
+      elements.typedRomaji.textContent = game.typedPrefix || "";
+
+      const active = getActiveSequences();
+      const guide = getNextGuideChar(active);
+      elements.nextGuide.textContent = guide || "完";
+
+      renderKanaUnits(active);
+      renderQuestionProgress(active);
+    }
+
+    function renderKanaUnits(activeSequences) {
+      const progress = getKanaProgress(activeSequences);
+      elements.kanaText.innerHTML = game.currentUnits.map((unit, index) => {
+        let className = "kana-unit";
+        if (index < progress.doneUnits) className += " done";
+        if (index === progress.currentUnit) className += " current";
+        return `<span class="${className}">${escapeHtml(unit)}</span>`;
+      }).join("");
+    }
+
+    function getKanaProgress(activeSequences) {
+      if (activeSequences.length === 0) {
+        return { doneUnits: 0, currentUnit: 0 };
+      }
+
+      // 最短の進捗を採用することで、候補差による過剰な進捗表示を避ける。
+      let minDone = Infinity;
+      for (const seq of activeSequences) {
+        let consumed = 0;
+        let offset = 0;
+        for (const segment of seq.segments) {
+          offset += segment.length;
+          if (game.typedPrefix.length >= offset) consumed += 1;
+        }
+        minDone = Math.min(minDone, consumed);
+      }
+
+      if (!Number.isFinite(minDone)) minDone = 0;
+      return {
+        doneUnits: minDone,
+        currentUnit: Math.min(minDone, game.currentUnits.length - 1),
+      };
+    }
+
+    function renderQuestionProgress(activeSequences) {
+      const active = activeSequences.length > 0 ? activeSequences : game.currentSequences;
+      const minLength = Math.min(...active.map(seq => seq.full.length));
+      const percent = minLength > 0 ? Math.min(100, (game.typedPrefix.length / minLength) * 100) : 0;
+      elements.questionProgress.style.width = `${percent}%`;
+    }
+
+    function getNextGuideChar(activeSequences) {
+      const chars = new Set();
+      for (const seq of activeSequences) {
+        const char = seq.full[game.typedPrefix.length];
+        if (char) chars.add(char);
+      }
+      return [...chars].sort().join(" / ");
+    }
+
+    function renderResult() {
+      const elapsedMin = Math.max((Date.now() - game.startTimeMs) / 60000, 1 / 60);
+      const accuracy = game.typedKeys + game.missKeys === 0
+        ? 0
+        : (game.typedKeys / (game.typedKeys + game.missKeys)) * 100;
+      const wpm = game.typedKeys / 5 / elapsedMin;
+
+      const items = [
+        ["スコア", game.score],
+        ["正解数", game.correctWords],
+        ["ミス数", game.missKeys],
+        ["入力文字数", game.typedKeys],
+        ["正答率", `${accuracy.toFixed(1)}%`],
+        ["WPM", wpm.toFixed(1)],
+      ];
+
+      elements.resultList.innerHTML = items.map(([label, value]) => `
+        <div class="stat">
+          <dt>${escapeHtml(label)}</dt>
+          <dd>${escapeHtml(String(value))}</dd>
+        </div>
+      `).join("");
+    }
+
+    function showLoadNotice(message, isWarning) {
+      elements.loadNotice.textContent = message;
+      elements.loadNotice.style.borderLeftColor = isWarning ? "var(--color-error)" : "var(--color-primary)";
+      elements.loadNotice.style.background = isWarning ? "#fff9e8" : "#eef0ff";
+    }
+
+    function showError(message) {
+      elements.errorBox.textContent = message;
+      elements.errorBox.classList.add("is-visible");
+    }
+
+    function hideError() {
+      elements.errorBox.textContent = "";
+      elements.errorBox.classList.remove("is-visible");
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+  </script>
+</body>
+</html>
